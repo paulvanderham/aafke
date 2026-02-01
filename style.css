@@ -23,7 +23,15 @@
 
 html, body {
     height: 100%;
+}
+
+html {
     overflow: hidden;
+}
+
+body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -221,17 +229,20 @@ body {
 #found-screen {
     background: linear-gradient(180deg, var(--background-dark) 0%, #0f0f23 100%);
     padding-top: 30px;
+    min-height: 100%;
+    height: auto;
 }
 
 #found-screen.active {
     display: block;
-    overflow-y: auto;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
 }
 
 .found-content {
     max-width: 500px;
     margin: 0 auto;
-    padding-bottom: 40px;
+    padding-bottom: 80px;
 }
 
 .found-header {
