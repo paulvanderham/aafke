@@ -6,6 +6,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('App gestart');
 
+    // Detect Chrome op iOS
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var isChrome = /CriOS/.test(navigator.userAgent);
+    var isChromeOnIOS = isIOS && isChrome;
+
     // Elementen
     const startButton = document.getElementById('start-gps-button');
     const testButton = document.getElementById('test-mode-button');
@@ -193,7 +198,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!currentPosition) {
             var msg = 'GPS fout. ';
             if (error.code === 1) {
-                msg = 'Geef toestemming voor locatie.';
+                if (isChromeOnIOS) {
+                    msg = 'Chrome op iPhone ondersteunt GPS niet goed.\n\nOpen deze pagina in Safari voor de beste ervaring.';
+                } else {
+                    msg = 'Geef toestemming voor locatie.';
+                }
                 stopGPS();
                 showError(msg);
             } else if (error.code === 2) {
@@ -349,6 +358,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ==================== INIT ====================
 
-    updateStatus('');
-    console.log('App klaar');
+    // Waarschuw Chrome op iOS gebruikers
+    if (isChromeOnIOS) {
+        updateStatus('⚠️ Gebruik Safari voor de beste ervaring');
+    } else {
+        updateStatus('');
+    }
+
+    console.log('App klaar, Chrome op iOS:', isChromeOnIOS);
 });
