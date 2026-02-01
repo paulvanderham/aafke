@@ -12,10 +12,9 @@
 
 const CONFIG = {
     // GPS coördinaten van het graf
-    // VERVANG DEZE met de echte coördinaten
     grave: {
-        latitude: 52.3676,   // Breedtegraad (voorbeeld: Amsterdam)
-        longitude: 4.9041,   // Lengtegraad (voorbeeld: Amsterdam)
+        latitude: 52.546352,
+        longitude: 6.457746,
     },
 
     // Afstand in meters waarbij de "gevonden" pagina wordt getoond
