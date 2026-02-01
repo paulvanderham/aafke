@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hasFound = false;
             showScreen('navigation');
             startButton.style.display = 'block';
-            updateStatus('Tik op de knop om te starten');
+            updateStatus('');
         });
     }
 
@@ -343,12 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
             stopGPS();
             showScreen('navigation');
             startButton.style.display = 'block';
-            updateStatus('Tik op de knop om te starten');
+            updateStatus('');
         });
     }
 
     // ==================== INIT ====================
 
-    updateStatus('Tik op de knop om te starten');
+    updateStatus('');
     console.log('App klaar');
 });
