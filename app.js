@@ -142,14 +142,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Start kompas
         startCompass();
 
-        // Chrome op iOS timeout: als na 10 sec geen GPS, adviseer Safari
+        // Chrome op iOS timeout: als na 5 sec geen GPS, adviseer Safari
         if (isChromeOnIOS) {
             setTimeout(function() {
                 if (gpsActive && !currentPosition) {
                     stopGPS();
                     showError('Chrome op iPhone kan geen GPS vinden.\n\nOpen deze pagina in Safari voor de beste ervaring.');
                 }
-            }, 10000);
+            }, 5000);
         }
     }
 
