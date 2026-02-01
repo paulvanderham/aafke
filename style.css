@@ -409,6 +409,34 @@ body {
     border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Start knop */
+.start-button {
+    display: block;
+    width: 100%;
+    max-width: 280px;
+    padding: 18px 40px;
+    margin: 20px auto 0;
+    background: var(--gold);
+    border: none;
+    border-radius: 30px;
+    color: var(--background-dark);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(201, 169, 98, 0.3);
+}
+
+.start-button:hover {
+    background: #d4b870;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(201, 169, 98, 0.4);
+}
+
+.start-button:active {
+    transform: translateY(0);
+}
+
 /* ============================================
    Fout Scherm
    ============================================ */
