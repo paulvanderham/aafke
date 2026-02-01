@@ -1,0 +1,557 @@
+/* ============================================
+   GPS Grave Finder - In Herinnering aan Aafke
+   Respectvolle en elegante styling
+   ============================================ */
+
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #8b7355;
+    --accent-color: #d4a574;
+    --background-light: #f5f1eb;
+    --background-dark: #1a1a2e;
+    --text-light: #ffffff;
+    --text-dark: #2c3e50;
+    --gold: #c9a962;
+    --soft-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Lato', sans-serif;
+    background: linear-gradient(135deg, var(--background-dark) 0%, #16213e 100%);
+    color: var(--text-light);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+}
+
+/* Schermen */
+.screen {
+    display: none;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.screen.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ============================================
+   Navigatie Scherm
+   ============================================ */
+
+#navigation-screen {
+    justify-content: space-between;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 300;
+}
+
+/* Kompas */
+.compass-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: 300px;
+}
+
+.compass {
+    position: relative;
+    width: 200px;
+    height: 200px;
+}
+
+.compass-circle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+}
+
+.compass-arrow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 80px;
+    transform-origin: center bottom;
+    transform: translate(-50%, -100%) rotate(0deg);
+    transition: transform 0.3s ease-out;
+}
+
+.compass-arrow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 30px solid var(--gold);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.compass-arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    background: var(--gold);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(201, 169, 98, 0.5);
+}
+
+/* Afstand display */
+.distance-display {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.distance-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 4rem;
+    font-weight: 600;
+    color: var(--gold);
+    line-height: 1;
+    display: block;
+}
+
+.distance-unit {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}
+
+/* Status berichten */
+.status-message {
+    text-align: center;
+    padding: 15px 25px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 25px;
+    margin: 15px 0;
+}
+
+.status-message p {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.status-message.close {
+    background: rgba(201, 169, 98, 0.2);
+    border: 1px solid var(--gold);
+}
+
+.status-message.close p {
+    color: var(--gold);
+}
+
+/* Nauwkeurigheid info */
+.accuracy-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.accuracy-value {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Instructies */
+.instructions {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.instructions p {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================
+   Gevonden Scherm
+   ============================================ */
+
+#found-screen {
+    background: linear-gradient(180deg, var(--background-dark) 0%, #0f0f23 100%);
+    padding-top: 30px;
+}
+
+#found-screen.active {
+    display: block;
+    overflow-y: auto;
+}
+
+.found-content {
+    max-width: 500px;
+    margin: 0 auto;
+    padding-bottom: 40px;
+}
+
+.found-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.candle-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    animation: flicker 2s infinite;
+}
+
+@keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.found-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text-light);
+}
+
+/* Foto container */
+.photo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.photo-frame {
+    width: 250px;
+    height: 300px;
+    border: 4px solid var(--gold);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.photo-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.photo-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(201, 169, 98, 0.1) 0%, rgba(201, 169, 98, 0.05) 100%);
+    text-align: center;
+    padding: 20px;
+}
+
+.photo-placeholder span {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+    margin-bottom: 10px;
+}
+
+.photo-placeholder .photo-instruction {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
+}
+
+/* Herinneringsvideo sectie */
+.memory-section {
+    margin-bottom: 30px;
+}
+
+.memory-section h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 15px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.video-container {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    background: #000;
+}
+
+.video-container video {
+    width: 100%;
+    display: block;
+}
+
+.video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background: linear-gradient(135deg, rgba(201, 169, 98, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+}
+
+.video-placeholder .play-icon {
+    width: 70px;
+    height: 70px;
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--gold);
+    margin-bottom: 15px;
+}
+
+.video-placeholder p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+}
+
+.video-placeholder .video-instruction {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 5px;
+}
+
+/* Herdenkingstekst */
+.memorial-text {
+    text-align: center;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.memorial-text .quote {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-style: italic;
+    color: var(--gold);
+}
+
+/* Terug knop */
+.back-button {
+    display: block;
+    width: 100%;
+    padding: 15px 30px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 30px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.back-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   Fout Scherm
+   ============================================ */
+
+#error-screen {
+    justify-content: center;
+    text-align: center;
+}
+
+.error-content {
+    max-width: 350px;
+}
+
+.error-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.error-content h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+}
+
+.error-content > p {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+.retry-button {
+    padding: 15px 40px;
+    background: var(--gold);
+    border: none;
+    border-radius: 30px;
+    color: var(--background-dark);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 30px;
+}
+
+.retry-button:hover {
+    background: #d4b870;
+    transform: translateY(-2px);
+}
+
+.help-text {
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.help-text p {
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.help-text ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.help-text li {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 5px 0;
+    padding-left: 20px;
+    position: relative;
+}
+
+.help-text li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+}
+
+/* ============================================
+   Responsieve aanpassingen
+   ============================================ */
+
+@media (max-height: 600px) {
+    .compass {
+        width: 150px;
+        height: 150px;
+    }
+
+    .compass-arrow {
+        height: 60px;
+    }
+
+    .distance-number {
+        font-size: 3rem;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .header h1 {
+        font-size: 2.2rem;
+    }
+
+    .compass {
+        width: 250px;
+        height: 250px;
+    }
+
+    .compass-arrow {
+        height: 100px;
+    }
+
+    .distance-number {
+        font-size: 5rem;
+    }
+
+    .photo-frame {
+        width: 300px;
+        height: 360px;
+    }
+}
+
+/* iOS Safe Area ondersteuning */
+@supports (padding: max(0px)) {
+    .screen {
+        padding-top: max(20px, env(safe-area-inset-top));
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+
+    #navigation-screen {
+        padding-top: max(40px, env(safe-area-inset-top));
+    }
+}
+
+/* Pulse animatie voor wanneer je dichtbij bent */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(201, 169, 98, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 20px rgba(201, 169, 98, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(201, 169, 98, 0);
+    }
+}
+
+.compass.near .compass-circle {
+    animation: pulse 1.5s infinite;
+    border-color: var(--gold);
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>In Herinnering aan Aafke</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Lato:wght@300;400&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigatie scherm -->
+    <div id="navigation-screen" class="screen active">
+        <div class="header">
+            <h1>In Herinnering aan Aafke</h1>
+            <p class="subtitle">Volg de weg naar haar rustplaats</p>
+        </div>
+
+        <div class="compass-container">
+            <div class="compass">
+                <div class="compass-arrow" id="compass-arrow"></div>
+                <div class="compass-circle"></div>
+            </div>
+        </div>
+
+        <div class="distance-display">
+            <span class="distance-number" id="distance-number">--</span>
+            <span class="distance-unit">meter</span>
+        </div>
+
+        <div class="status-message" id="status-message">
+            <p>GPS wordt geactiveerd...</p>
+        </div>
+
+        <div class="accuracy-info" id="accuracy-info">
+            <span class="accuracy-label">Nauwkeurigheid:</span>
+            <span class="accuracy-value" id="accuracy-value">--</span>
+        </div>
+
+        <div class="instructions">
+            <p>Loop in de richting van de pijl</p>
+        </div>
+    </div>
+
+    <!-- Gevonden scherm -->
+    <div id="found-screen" class="screen">
+        <div class="found-content">
+            <div class="found-header">
+                <div class="candle-icon">🕯️</div>
+                <h1>Je hebt de rustplaats van Aafke gevonden</h1>
+            </div>
+
+            <div class="photo-container">
+                <div class="photo-frame">
+                    <!-- Vervang dit met de echte foto -->
+                    <img src="foto-aafke.jpg" alt="Foto van Aafke" id="aafke-photo" onerror="this.parentElement.innerHTML='<div class=\'photo-placeholder\'><span>Foto van Aafke</span><p class=\'photo-instruction\'>Plaats foto-aafke.jpg in dezelfde map</p></div>'">
+                </div>
+            </div>
+
+            <div class="memory-section">
+                <h2>Herinneringsvideo</h2>
+                <div class="video-container">
+                    <!-- Vervang dit met de echte video -->
+                    <video id="memory-video" controls poster="video-poster.jpg">
+                        <source src="herinnering-aafke.mp4" type="video/mp4">
+                        <source src="herinnering-aafke.webm" type="video/webm">
+                        <p>Je browser ondersteunt geen video.
+                           <a href="herinnering-aafke.mp4">Download de video</a>
+                        </p>
+                    </video>
+                    <div class="video-placeholder" id="video-placeholder">
+                        <div class="play-icon">▶</div>
+                        <p>Herinneringsvideo</p>
+                        <p class="video-instruction">Plaats herinnering-aafke.mp4 in dezelfde map</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="memorial-text">
+                <p class="quote">"Voor altijd in onze harten"</p>
+            </div>
+
+            <button class="back-button" id="back-button">
+                ← Terug naar navigatie
+            </button>
+        </div>
+    </div>
+
+    <!-- Foutmelding scherm -->
+    <div id="error-screen" class="screen">
+        <div class="error-content">
+            <div class="error-icon">📍</div>
+            <h2>GPS Toegang Nodig</h2>
+            <p id="error-message">Om de rustplaats te vinden hebben we toegang tot je locatie nodig.</p>
+            <button class="retry-button" id="retry-button">Probeer opnieuw</button>
+            <div class="help-text">
+                <p><strong>Hulp:</strong></p>
+                <ul>
+                    <li>Zorg dat locatieservices aan staan</li>
+                    <li>Geef toestemming voor locatie in je browser</li>
+                    <li>Gebruik deze pagina buiten voor het beste GPS signaal</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
