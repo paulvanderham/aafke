@@ -36,32 +36,11 @@ class GraveFinderApp {
         this.elements.retryButton.addEventListener('click', () => this.startTracking());
         this.elements.backButton.addEventListener('click', () => this.showScreen('navigation'));
 
-        // Check voor video beschikbaarheid
-        this.checkVideoAvailability();
-
         // Start GPS tracking
         this.startTracking();
 
         // Probeer device orientation te gebruiken voor kompas
         this.initDeviceOrientation();
-    }
-
-    /**
-     * Check of de video beschikbaar is
-     */
-    checkVideoAvailability() {
-        const video = document.getElementById('memory-video');
-        const placeholder = document.getElementById('video-placeholder');
-
-        video.addEventListener('loadeddata', () => {
-            if (placeholder) placeholder.style.display = 'none';
-            video.style.display = 'block';
-        });
-
-        video.addEventListener('error', () => {
-            video.style.display = 'none';
-            if (placeholder) placeholder.style.display = 'flex';
-        });
     }
 
     /**
