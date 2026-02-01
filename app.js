@@ -26,17 +26,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // State
     let currentPosition = null;
     let watchId = null;
+    let pollInterval = null;
     let deviceHeading = 0;
     let targetRotation = 0;
     let currentRotation = 0;
     let hasFound = false;
     let animationFrame = null;
+    let gpsActive = false;
 
     // ==================== SCHERM FUNCTIES ====================
 
     function showScreen(name) {
         console.log('Toon scherm:', name);
-        Object.values(screens).forEach(s => s.classList.remove('active'));
+        Object.values(screens).forEach(function(s) {
+            s.classList.remove('active');
+        });
         if (screens[name]) {
             screens[name].classList.add('active');
         }
@@ -62,13 +66,11 @@ document.addEventListener('DOMContentLoaded', function() {
         updateDistance(3.2);
         updateAccuracy(5);
 
-        // Simuleer positie dichtbij het graf
         currentPosition = {
             latitude: CONFIG.grave.latitude + 0.00002,
             longitude: CONFIG.grave.longitude + 0.00002
         };
 
-        // Toon gevonden scherm na 2 seconden
         setTimeout(function() {
             console.log('Test: toon gevonden scherm');
             triggerFound();
@@ -83,17 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.log('Graf gevonden!');
 
-        // Vibreer
         if (navigator.vibrate) {
             navigator.vibrate([200, 100, 200]);
         }
 
-        // Stop GPS
-        if (watchId) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-        }
-
+        stopGPS();
         showScreen('found');
     }
 
@@ -107,71 +103,105 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        gpsActive = true;
         updateStatus('GPS wordt gezocht...');
         startButton.style.display = 'none';
 
-        // Start GPS watching
+        // Methode 1: watchPosition voor continue updates
         watchId = navigator.geolocation.watchPosition(
             onPositionSuccess,
             onPositionError,
             {
                 enableHighAccuracy: true,
                 timeout: 30000,
-                maximumAge: 5000
+                maximumAge: 0  // Altijd verse positie
             }
         );
 
-        // Start ook orientation
+        // Methode 2: Poll elke 2 seconden als backup
+        pollInterval = setInterval(function() {
+            if (gpsActive) {
+                console.log('GPS poll...');
+                navigator.geolocation.getCurrentPosition(
+                    onPositionSuccess,
+                    function(err) { console.log('Poll error:', err.code); },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            }
+        }, 2000);
+
+        // Start kompas
         startCompass();
     }
 
+    function stopGPS() {
+        gpsActive = false;
+
+        if (watchId) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
+
     function onPositionSuccess(position) {
-        console.log('GPS positie:', position.coords.latitude, position.coords.longitude);
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        var acc = position.coords.accuracy;
+
+        console.log('GPS:', lat.toFixed(6), lon.toFixed(6), 'acc:', Math.round(acc) + 'm');
 
         currentPosition = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
+            latitude: lat,
+            longitude: lon
         };
 
         // Bereken afstand
-        const distance = calculateDistance(
-            currentPosition.latitude,
-            currentPosition.longitude,
+        var distance = calculateDistance(
+            lat, lon,
             CONFIG.grave.latitude,
             CONFIG.grave.longitude
         );
 
-        console.log('Afstand:', distance, 'meter');
+        console.log('Afstand:', Math.round(distance) + 'm');
 
         updateDistance(distance);
-        updateAccuracy(position.coords.accuracy);
-
-        // Update pijl
-        updateArrow();
+        updateAccuracy(acc);
 
         // Check of we er zijn
-        if (distance <= CONFIG.foundDistance) {
+        if (distance <= CONFIG.foundDistance && !hasFound) {
             triggerFound();
         } else if (distance <= CONFIG.nearDistance) {
-            updateStatus('Je bent heel dichtbij...');
+            updateStatus('Je bent heel dichtbij... ' + Math.round(distance) + 'm');
         } else {
-            updateStatus('Volg de pijl naar de rustplaats');
+            updateStatus('Afstand: ' + Math.round(distance) + ' meter');
         }
     }
 
     function onPositionError(error) {
         console.log('GPS error:', error.code, error.message);
 
-        let msg = 'GPS fout. ';
-        if (error.code === 1) {
-            msg = 'Geef toestemming voor locatie in je browser instellingen.';
-        } else if (error.code === 2) {
-            msg = 'Locatie niet beschikbaar. Ga naar buiten.';
-        } else if (error.code === 3) {
-            msg = 'GPS time-out. Probeer opnieuw.';
+        // Niet meteen opgeven - wacht op poll resultaat
+        if (!currentPosition) {
+            var msg = 'GPS fout. ';
+            if (error.code === 1) {
+                msg = 'Geef toestemming voor locatie.';
+                stopGPS();
+                showError(msg);
+            } else if (error.code === 2) {
+                updateStatus('Wachten op GPS signaal...');
+            } else if (error.code === 3) {
+                updateStatus('GPS zoeken...');
+            }
         }
-
-        showError(msg);
     }
 
     function showError(msg) {
@@ -193,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         addOrientationListener();
                     }
                 })
-                .catch(console.log);
+                .catch(function(err) { console.log('Orientation error:', err); });
         } else {
             addOrientationListener();
         }
@@ -208,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function onOrientation(event) {
-        let heading = 0;
+        var heading = 0;
 
         // iOS
         if (event.webkitCompassHeading !== undefined) {
@@ -225,15 +255,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function startArrowAnimation() {
         function animate() {
             if (currentPosition) {
-                // Bereken richting naar graf
-                const bearing = calculateBearing(
+                var bearing = calculateBearing(
                     currentPosition.latitude,
                     currentPosition.longitude,
                     CONFIG.grave.latitude,
                     CONFIG.grave.longitude
                 );
 
-                // Relatieve richting (compenseer voor device heading)
                 targetRotation = bearing - deviceHeading;
 
                 // Normaliseer naar -180 tot 180
@@ -241,12 +269,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 while (targetRotation < -180) targetRotation += 360;
 
                 // Smooth interpolatie
-                let diff = targetRotation - currentRotation;
+                var diff = targetRotation - currentRotation;
                 while (diff > 180) diff -= 360;
                 while (diff < -180) diff += 360;
                 currentRotation += diff * 0.1;
 
-                // Update pijl
                 compassArrow.style.transform = 'translate(-50%, -100%) rotate(' + currentRotation + 'deg)';
             }
 
@@ -256,49 +283,35 @@ document.addEventListener('DOMContentLoaded', function() {
         animate();
     }
 
-    function updateArrow() {
-        if (!currentPosition) return;
-
-        const bearing = calculateBearing(
-            currentPosition.latitude,
-            currentPosition.longitude,
-            CONFIG.grave.latitude,
-            CONFIG.grave.longitude
-        );
-
-        targetRotation = bearing - deviceHeading;
-    }
-
     // ==================== BEREKENINGEN ====================
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // meters
-        const rad = Math.PI / 180;
-        const dLat = (lat2 - lat1) * rad;
-        const dLon = (lon2 - lon1) * rad;
+        var R = 6371000;
+        var rad = Math.PI / 180;
+        var dLat = (lat2 - lat1) * rad;
+        var dLon = (lon2 - lon1) * rad;
 
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     function calculateBearing(lat1, lon1, lat2, lon2) {
-        const rad = Math.PI / 180;
-        const dLon = (lon2 - lon1) * rad;
+        var rad = Math.PI / 180;
+        var dLon = (lon2 - lon1) * rad;
 
-        const y = Math.sin(dLon) * Math.cos(lat2 * rad);
-        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
-                  Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+        var y = Math.sin(dLon) * Math.cos(lat2 * rad);
+        var x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+                Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
 
-        let bearing = Math.atan2(y, x) * 180 / Math.PI;
+        var bearing = Math.atan2(y, x) * 180 / Math.PI;
         return (bearing + 360) % 360;
     }
 
     // ==================== EVENT LISTENERS ====================
 
-    // Start knop
     if (startButton) {
         startButton.addEventListener('click', function() {
             console.log('Start knop geklikt');
@@ -306,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Test knop
     if (testButton) {
         testButton.addEventListener('click', function() {
             console.log('Test knop geklikt');
@@ -314,7 +326,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Retry knop
     if (retryButton) {
         retryButton.addEventListener('click', function() {
             console.log('Retry knop geklikt');
@@ -325,11 +336,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Terug knop
     if (backButton) {
         backButton.addEventListener('click', function() {
             console.log('Terug knop geklikt');
             hasFound = false;
+            stopGPS();
             showScreen('navigation');
             startButton.style.display = 'block';
             updateStatus('Tik op de knop om te starten');
