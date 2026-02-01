@@ -8,9 +8,11 @@ class GraveFinderApp {
         this.watchId = null;
         this.currentPosition = null;
         this.hasFound = false;
-        this.deviceHeading = null;
+        this.deviceHeading = 0;
         this.gpsStarted = false;
         this.gpsAttempts = 0;
+        this.lastRotation = 0;
+        this.testMode = false;
 
         // DOM elementen
         this.screens = {
@@ -28,7 +30,8 @@ class GraveFinderApp {
             errorMessage: document.getElementById('error-message'),
             retryButton: document.getElementById('retry-button'),
             backButton: document.getElementById('back-button'),
-            startButton: document.getElementById('start-gps-button')
+            startButton: document.getElementById('start-gps-button'),
+            testButton: document.getElementById('test-mode-button')
         };
 
         this.init();
@@ -40,9 +43,12 @@ class GraveFinderApp {
             this.gpsAttempts = 0;
             this.startTracking();
         });
-        this.elements.backButton.addEventListener('click', () => this.showScreen('navigation'));
+        this.elements.backButton.addEventListener('click', () => {
+            this.testMode = false;
+            this.showScreen('navigation');
+        });
 
-        // Start knop voor iOS en andere devices die user gesture vereisen
+        // Start knop
         if (this.elements.startButton) {
             this.elements.startButton.addEventListener('click', () => {
                 this.elements.startButton.style.display = 'none';
@@ -51,20 +57,60 @@ class GraveFinderApp {
             });
         }
 
+        // Test modus knop
+        if (this.elements.testButton) {
+            this.elements.testButton.addEventListener('click', () => this.activateTestMode());
+        }
+
         // Toon instructies
         this.updateStatus('Tik op de knop om te starten');
 
-        // Check of we HTTPS gebruiken (vereist voor GPS)
+        // Check HTTPS
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            this.updateStatus('⚠️ GPS werkt alleen via HTTPS. Gebruik een beveiligde verbinding.');
+            this.updateStatus('⚠️ GPS werkt alleen via HTTPS');
         }
+    }
+
+    /**
+     * Activeer test modus - simuleer dat je bij het graf bent
+     */
+    activateTestMode() {
+        this.testMode = true;
+
+        // Simuleer een positie vlakbij het graf (3 meter afstand)
+        const testLat = CONFIG.grave.latitude + 0.00002;
+        const testLon = CONFIG.grave.longitude + 0.00002;
+
+        this.currentPosition = {
+            latitude: testLat,
+            longitude: testLon,
+            accuracy: 5,
+            heading: 0
+        };
+
+        // Bereken de gesimuleerde afstand
+        const distance = this.calculateDistance(
+            testLat, testLon,
+            CONFIG.grave.latitude, CONFIG.grave.longitude
+        );
+
+        this.updateDistance(distance);
+        this.updateAccuracy(5);
+        this.updateStatus('🧪 TESTMODUS: ' + distance.toFixed(1) + 'm van doel');
+
+        // Trigger "gevonden" na 2 seconden
+        setTimeout(() => {
+            if (this.testMode) {
+                this.handleFound();
+            }
+        }, 2000);
     }
 
     /**
      * Initialiseer device orientation voor kompas heading
      */
     initDeviceOrientation() {
-        // Vraag permissie op iOS 13+
+        // iOS 13+ vereist permissie
         if (typeof DeviceOrientationEvent !== 'undefined' &&
             typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
@@ -73,43 +119,77 @@ class GraveFinderApp {
                         this.setupOrientationListener();
                     }
                 })
-                .catch(err => {
-                    console.log('Orientation permission error:', err);
-                });
+                .catch(err => console.log('Orientation error:', err));
         } else {
-            // Niet-iOS of oudere versies
             this.setupOrientationListener();
         }
     }
 
     /**
-     * Setup de orientation event listener
+     * Setup orientation listeners
      */
     setupOrientationListener() {
+        // Gebruik absolute orientation als beschikbaar (Android)
         window.addEventListener('deviceorientationabsolute', (e) => {
-            if (e.alpha !== null) {
-                this.deviceHeading = e.alpha;
-                this.updateCompassArrow();
-            }
-        });
+            this.handleOrientation(e, true);
+        }, true);
 
-        // Fallback voor devices zonder absolute orientation
+        // Fallback voor iOS en andere devices
         window.addEventListener('deviceorientation', (e) => {
-            if (this.deviceHeading === null && e.alpha !== null) {
-                // webkitCompassHeading is nauwkeuriger op iOS
-                this.deviceHeading = e.webkitCompassHeading || e.alpha;
-                this.updateCompassArrow();
+            this.handleOrientation(e, false);
+        }, true);
+    }
+
+    /**
+     * Handle orientation event
+     */
+    handleOrientation(e, isAbsolute) {
+        let heading = 0;
+
+        // iOS gebruikt webkitCompassHeading (0-360, 0 = noord)
+        if (e.webkitCompassHeading !== undefined) {
+            heading = e.webkitCompassHeading;
+        }
+        // Android/andere browsers gebruiken alpha
+        else if (e.alpha !== null) {
+            if (isAbsolute) {
+                // Absolute orientation: alpha is heading van noord
+                heading = 360 - e.alpha;
+            } else {
+                // Relatieve orientation
+                heading = 360 - e.alpha;
             }
-        });
+        }
+
+        // Normaliseer naar 0-360
+        heading = ((heading % 360) + 360) % 360;
+
+        // Smooth de heading om schokken te voorkomen
+        this.deviceHeading = this.smoothAngle(this.deviceHeading, heading, 0.3);
+
+        this.updateCompassArrow();
+    }
+
+    /**
+     * Smooth een hoek overgang
+     */
+    smoothAngle(current, target, factor) {
+        // Bereken het kortste pad tussen twee hoeken
+        let diff = target - current;
+
+        // Normaliseer verschil naar -180 tot 180
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+
+        return current + diff * factor;
     }
 
     /**
      * Start GPS tracking
      */
     startTracking() {
-        // Check voor Geolocation ondersteuning
         if (!('geolocation' in navigator)) {
-            this.showError('Je browser ondersteunt geen GPS. Probeer een moderne browser zoals Chrome of Safari.');
+            this.showError('Je browser ondersteunt geen GPS.');
             return;
         }
 
@@ -117,56 +197,44 @@ class GraveFinderApp {
         this.gpsAttempts++;
         this.showScreen('navigation');
 
-        // Verberg start knop
         if (this.elements.startButton) {
             this.elements.startButton.style.display = 'none';
         }
 
-        // Animeer de loading status
         this.startLoadingAnimation();
 
-        // Stop eventuele bestaande watch
         if (this.watchId) {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;
         }
 
-        // Strategie: probeer eerst snel met lage nauwkeurigheid, dan met hoge
         this.tryGetPosition();
     }
 
     /**
-     * Probeer GPS positie te krijgen met verschillende strategieën
+     * Probeer GPS positie te krijgen
      */
     tryGetPosition() {
         const attempt = this.gpsAttempts;
 
-        // Eerste poging: snelle, minder nauwkeurige positie
-        this.updateStatus('Locatie opvragen...');
-
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                console.log('GPS positie ontvangen:', position.coords);
                 this.handlePosition(position);
-                // Start daarna watchPosition voor updates
                 this.startWatching();
             },
             (error) => {
-                console.log('Eerste GPS poging mislukt:', error.code, error.message);
-                // Probeer met andere instellingen
+                console.log('GPS poging mislukt:', error.code);
                 this.tryHighAccuracy();
             },
             {
                 enableHighAccuracy: false,
                 timeout: 10000,
-                maximumAge: 60000  // Accepteer cached positie tot 1 minuut oud
+                maximumAge: 60000
             }
         );
 
-        // Timeout fallback
         setTimeout(() => {
             if (!this.currentPosition && this.gpsStarted && this.gpsAttempts === attempt) {
-                console.log('GPS timeout na 15 seconden, probeer andere methode');
                 this.tryHighAccuracy();
             }
         }, 15000);
@@ -176,20 +244,14 @@ class GraveFinderApp {
      * Probeer met hoge nauwkeurigheid
      */
     tryHighAccuracy() {
-        if (this.currentPosition) return; // Al gelukt
-
-        this.updateStatus('GPS signaal zoeken...');
+        if (this.currentPosition) return;
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                console.log('GPS hoge nauwkeurigheid gelukt:', position.coords);
                 this.handlePosition(position);
                 this.startWatching();
             },
-            (error) => {
-                console.log('Hoge nauwkeurigheid mislukt:', error.code, error.message);
-                this.handleError(error);
-            },
+            (error) => this.handleError(error),
             {
                 enableHighAccuracy: true,
                 timeout: 20000,
@@ -206,10 +268,7 @@ class GraveFinderApp {
 
         this.watchId = navigator.geolocation.watchPosition(
             (position) => this.handlePosition(position),
-            (error) => {
-                console.log('Watch error:', error.code, error.message);
-                // Niet meteen stoppen bij watch errors
-            },
+            (error) => console.log('Watch error:', error.code),
             {
                 enableHighAccuracy: true,
                 timeout: 30000,
@@ -219,21 +278,14 @@ class GraveFinderApp {
     }
 
     /**
-     * Start een loading animatie
+     * Loading animatie
      */
     startLoadingAnimation() {
         let dots = 0;
-        const messages = [
-            'Locatie opvragen',
-            'GPS signaal zoeken',
-            'Verbinden met satellieten',
-            'Positie bepalen'
-        ];
+        const messages = ['Locatie opvragen', 'GPS signaal zoeken', 'Positie bepalen'];
         let msgIndex = 0;
 
-        if (this.loadingInterval) {
-            clearInterval(this.loadingInterval);
-        }
+        if (this.loadingInterval) clearInterval(this.loadingInterval);
 
         this.loadingInterval = setInterval(() => {
             if (this.currentPosition) {
@@ -241,22 +293,17 @@ class GraveFinderApp {
                 return;
             }
             dots = (dots + 1) % 4;
-            if (dots === 0) {
-                msgIndex = (msgIndex + 1) % messages.length;
-            }
-            const dotStr = '.'.repeat(dots || 1);
-            this.updateStatus(`${messages[msgIndex]}${dotStr}`);
+            if (dots === 0) msgIndex = (msgIndex + 1) % messages.length;
+            this.updateStatus(`${messages[msgIndex]}${'.'.repeat(dots || 1)}`);
         }, 600);
     }
 
     /**
-     * Handle nieuwe GPS positie
+     * Handle GPS positie
      */
     handlePosition(position) {
-        // Stop loading animatie
-        if (this.loadingInterval) {
-            clearInterval(this.loadingInterval);
-        }
+        if (this.loadingInterval) clearInterval(this.loadingInterval);
+        if (this.testMode) return; // Niet updaten in testmodus
 
         this.currentPosition = {
             latitude: position.coords.latitude,
@@ -265,7 +312,6 @@ class GraveFinderApp {
             heading: position.coords.heading
         };
 
-        // Bereken afstand tot het graf
         const distance = this.calculateDistance(
             this.currentPosition.latitude,
             this.currentPosition.longitude,
@@ -273,12 +319,10 @@ class GraveFinderApp {
             CONFIG.grave.longitude
         );
 
-        // Update UI
         this.updateDistance(distance);
         this.updateAccuracy(position.coords.accuracy);
         this.updateCompassArrow();
 
-        // Check of we dichtbij genoeg zijn
         if (distance <= CONFIG.foundDistance && !this.hasFound) {
             this.handleFound();
         } else if (distance <= CONFIG.nearDistance) {
@@ -291,25 +335,24 @@ class GraveFinderApp {
     }
 
     /**
-     * Bereken afstand tussen twee GPS punten (Haversine formule)
+     * Bereken afstand (Haversine)
      */
     calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // Radius van de aarde in meters
+        const R = 6371000;
         const φ1 = lat1 * Math.PI / 180;
         const φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180;
         const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const a = Math.sin(Δφ / 2) ** 2 +
+                  Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        return R * c; // Afstand in meters
+        return R * c;
     }
 
     /**
-     * Bereken de bearing (richting) naar het doel
+     * Bereken bearing naar doel
      */
     calculateBearing(lat1, lon1, lat2, lon2) {
         const φ1 = lat1 * Math.PI / 180;
@@ -321,18 +364,16 @@ class GraveFinderApp {
                   Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
 
         let bearing = Math.atan2(y, x) * 180 / Math.PI;
-        bearing = (bearing + 360) % 360; // Normaliseer naar 0-360
-
-        return bearing;
+        return ((bearing % 360) + 360) % 360;
     }
 
     /**
-     * Update de kompas pijl richting
+     * Update kompas pijl
      */
     updateCompassArrow() {
         if (!this.currentPosition) return;
 
-        // Bereken de bearing naar het graf
+        // Bearing naar het graf (0 = noord)
         const bearing = this.calculateBearing(
             this.currentPosition.latitude,
             this.currentPosition.longitude,
@@ -340,41 +381,44 @@ class GraveFinderApp {
             CONFIG.grave.longitude
         );
 
-        // Compenseer voor device heading als beschikbaar
-        let rotation = bearing;
-        if (this.deviceHeading !== null) {
-            rotation = bearing - this.deviceHeading;
-        }
+        // Relatieve richting = bearing - device heading
+        // Als device naar noord wijst (heading=0) en graf in oosten (bearing=90),
+        // dan moet pijl 90 graden naar rechts wijzen
+        let rotation = bearing - this.deviceHeading;
 
-        // Update de pijl rotatie
+        // Normaliseer naar -180 tot 180 voor soepele overgang
+        while (rotation > 180) rotation -= 360;
+        while (rotation < -180) rotation += 360;
+
+        // Smooth de rotatie
+        let diff = rotation - this.lastRotation;
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+
+        this.lastRotation = this.lastRotation + diff * 0.2;
+
         this.elements.compassArrow.style.transform =
-            `translate(-50%, -100%) rotate(${rotation}deg)`;
+            `translate(-50%, -100%) rotate(${this.lastRotation}deg)`;
     }
 
     /**
-     * Update de afstand display
+     * Update afstand display
      */
     updateDistance(distance) {
-        const displayDistance = distance < 10
-            ? distance.toFixed(1)
-            : Math.round(distance);
-
-        this.elements.distanceNumber.textContent = displayDistance;
+        const display = distance < 10 ? distance.toFixed(1) : Math.round(distance);
+        this.elements.distanceNumber.textContent = display;
     }
 
     /**
-     * Update de nauwkeurigheid indicator
+     * Update nauwkeurigheid
      */
     updateAccuracy(accuracy) {
-        const displayAccuracy = accuracy < 10
-            ? `±${accuracy.toFixed(1)}m`
-            : `±${Math.round(accuracy)}m`;
-
-        this.elements.accuracyValue.textContent = displayAccuracy;
+        const display = accuracy < 10 ? `±${accuracy.toFixed(1)}m` : `±${Math.round(accuracy)}m`;
+        this.elements.accuracyValue.textContent = display;
     }
 
     /**
-     * Update het status bericht
+     * Update status bericht
      */
     updateStatus(message, isClose = false) {
         this.elements.statusMessage.innerHTML = `<p>${message}</p>`;
@@ -382,20 +426,17 @@ class GraveFinderApp {
     }
 
     /**
-     * Handle wanneer het graf is gevonden
+     * Graf gevonden
      */
     handleFound() {
         this.hasFound = true;
 
-        // Vibreer als ondersteund (haptic feedback)
         if ('vibrate' in navigator) {
             navigator.vibrate([200, 100, 200]);
         }
 
-        // Toon het gevonden scherm
         this.showScreen('found');
 
-        // Stop GPS tracking om batterij te sparen
         if (this.watchId) {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;
@@ -406,33 +447,28 @@ class GraveFinderApp {
      * Handle GPS errors
      */
     handleError(error) {
-        // Stop loading animatie
-        if (this.loadingInterval) {
-            clearInterval(this.loadingInterval);
-        }
+        if (this.loadingInterval) clearInterval(this.loadingInterval);
 
         let message = '';
-        let showHelp = true;
-
         switch (error.code) {
-            case 1: // PERMISSION_DENIED
-                message = 'Locatie toegang geweigerd.\n\nGa naar je telefoon instellingen en geef deze website toestemming voor locatie.';
+            case 1:
+                message = 'Locatie toegang geweigerd.\n\nGeef toestemming in je instellingen.';
                 break;
-            case 2: // POSITION_UNAVAILABLE
-                message = 'Locatie niet beschikbaar.\n\nTips:\n• Ga naar buiten\n• Wacht op GPS signaal\n• Controleer of locatie aan staat';
+            case 2:
+                message = 'Locatie niet beschikbaar.\n\nGa naar buiten voor beter signaal.';
                 break;
-            case 3: // TIMEOUT
-                message = 'Kon geen GPS signaal vinden.\n\nTips:\n• Zet locatie/GPS aan in je telefoon instellingen\n• Ga naar buiten voor beter signaal\n• Probeer opnieuw';
+            case 3:
+                message = 'GPS time-out.\n\nControleer of locatie aan staat.';
                 break;
             default:
-                message = 'Er ging iets mis.\n\nControleer of locatieservices aan staan en probeer opnieuw.';
+                message = 'Er ging iets mis. Probeer opnieuw.';
         }
 
         this.showError(message);
     }
 
     /**
-     * Toon foutmelding scherm
+     * Toon foutmelding
      */
     showError(message) {
         this.gpsStarted = false;
@@ -442,20 +478,18 @@ class GraveFinderApp {
     }
 
     /**
-     * Wissel tussen schermen
+     * Wissel scherm
      */
     showScreen(screenName) {
-        Object.values(this.screens).forEach(screen => {
-            screen.classList.remove('active');
-        });
+        Object.values(this.screens).forEach(s => s.classList.remove('active'));
 
         if (this.screens[screenName]) {
             this.screens[screenName].classList.add('active');
         }
 
-        // Als we teruggaan naar navigatie, reset en toon start knop
         if (screenName === 'navigation' && !this.gpsStarted) {
             this.hasFound = false;
+            this.testMode = false;
             if (this.elements.startButton) {
                 this.elements.startButton.style.display = 'block';
             }
@@ -464,7 +498,7 @@ class GraveFinderApp {
     }
 }
 
-// Start de applicatie wanneer de DOM geladen is
+// Start app
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new GraveFinderApp();
 });

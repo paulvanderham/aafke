@@ -113,7 +113,9 @@ body {
     height: 80px;
     transform-origin: center bottom;
     transform: translate(-50%, -100%) rotate(0deg);
-    transition: transform 0.3s ease-out;
+    /* Soepele animatie zonder springende overgangen */
+    transition: none;
+    will-change: transform;
 }
 
 .compass-arrow::before {
@@ -435,6 +437,28 @@ body {
 
 .start-button:active {
     transform: translateY(0);
+}
+
+/* Test knop (tijdelijk) */
+.test-button {
+    display: block;
+    width: 100%;
+    max-width: 220px;
+    padding: 12px 25px;
+    margin: 15px auto 0;
+    background: transparent;
+    border: 2px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.test-button:hover {
+    border-color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* ============================================
