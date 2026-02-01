@@ -10,6 +10,7 @@ class GraveFinderApp {
         this.hasFound = false;
         this.deviceHeading = null;
         this.gpsStarted = false;
+        this.gpsAttempts = 0;
 
         // DOM elementen
         this.screens = {
@@ -35,7 +36,10 @@ class GraveFinderApp {
 
     init() {
         // Event listeners
-        this.elements.retryButton.addEventListener('click', () => this.startTracking());
+        this.elements.retryButton.addEventListener('click', () => {
+            this.gpsAttempts = 0;
+            this.startTracking();
+        });
         this.elements.backButton.addEventListener('click', () => this.showScreen('navigation'));
 
         // Start knop voor iOS en andere devices die user gesture vereisen
@@ -52,7 +56,7 @@ class GraveFinderApp {
 
         // Check of we HTTPS gebruiken (vereist voor GPS)
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            this.updateStatus('Let op: GPS werkt alleen via HTTPS');
+            this.updateStatus('⚠️ GPS werkt alleen via HTTPS. Gebruik een beveiligde verbinding.');
         }
     }
 
@@ -105,13 +109,13 @@ class GraveFinderApp {
     startTracking() {
         // Check voor Geolocation ondersteuning
         if (!('geolocation' in navigator)) {
-            this.showError('Je browser ondersteunt geen GPS. Probeer een moderne browser.');
+            this.showError('Je browser ondersteunt geen GPS. Probeer een moderne browser zoals Chrome of Safari.');
             return;
         }
 
         this.gpsStarted = true;
+        this.gpsAttempts++;
         this.showScreen('navigation');
-        this.updateStatus('GPS wordt gezocht...');
 
         // Verberg start knop
         if (this.elements.startButton) {
@@ -121,34 +125,97 @@ class GraveFinderApp {
         // Animeer de loading status
         this.startLoadingAnimation();
 
-        const options = {
-            enableHighAccuracy: true,
-            timeout: 30000,  // 30 seconden timeout
-            maximumAge: 5000 // Cache positie max 5 sec
-        };
-
         // Stop eventuele bestaande watch
         if (this.watchId) {
             navigator.geolocation.clearWatch(this.watchId);
+            this.watchId = null;
         }
 
-        // Start watching position
-        this.watchId = navigator.geolocation.watchPosition(
-            (position) => this.handlePosition(position),
-            (error) => this.handleError(error),
-            options
+        // Strategie: probeer eerst snel met lage nauwkeurigheid, dan met hoge
+        this.tryGetPosition();
+    }
+
+    /**
+     * Probeer GPS positie te krijgen met verschillende strategieën
+     */
+    tryGetPosition() {
+        const attempt = this.gpsAttempts;
+
+        // Eerste poging: snelle, minder nauwkeurige positie
+        this.updateStatus('Locatie opvragen...');
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('GPS positie ontvangen:', position.coords);
+                this.handlePosition(position);
+                // Start daarna watchPosition voor updates
+                this.startWatching();
+            },
+            (error) => {
+                console.log('Eerste GPS poging mislukt:', error.code, error.message);
+                // Probeer met andere instellingen
+                this.tryHighAccuracy();
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 60000  // Accepteer cached positie tot 1 minuut oud
+            }
         );
 
-        // Fallback: als na 5 seconden nog niets, probeer getCurrentPosition
+        // Timeout fallback
         setTimeout(() => {
-            if (!this.currentPosition && this.gpsStarted) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => this.handlePosition(position),
-                    (error) => console.log('Fallback GPS error:', error),
-                    { enableHighAccuracy: false, timeout: 10000 }
-                );
+            if (!this.currentPosition && this.gpsStarted && this.gpsAttempts === attempt) {
+                console.log('GPS timeout na 15 seconden, probeer andere methode');
+                this.tryHighAccuracy();
             }
-        }, 5000);
+        }, 15000);
+    }
+
+    /**
+     * Probeer met hoge nauwkeurigheid
+     */
+    tryHighAccuracy() {
+        if (this.currentPosition) return; // Al gelukt
+
+        this.updateStatus('GPS signaal zoeken...');
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('GPS hoge nauwkeurigheid gelukt:', position.coords);
+                this.handlePosition(position);
+                this.startWatching();
+            },
+            (error) => {
+                console.log('Hoge nauwkeurigheid mislukt:', error.code, error.message);
+                this.handleError(error);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    /**
+     * Start continue GPS watching
+     */
+    startWatching() {
+        if (this.watchId) return;
+
+        this.watchId = navigator.geolocation.watchPosition(
+            (position) => this.handlePosition(position),
+            (error) => {
+                console.log('Watch error:', error.code, error.message);
+                // Niet meteen stoppen bij watch errors
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 30000,
+                maximumAge: 5000
+            }
+        );
     }
 
     /**
@@ -156,15 +223,30 @@ class GraveFinderApp {
      */
     startLoadingAnimation() {
         let dots = 0;
+        const messages = [
+            'Locatie opvragen',
+            'GPS signaal zoeken',
+            'Verbinden met satellieten',
+            'Positie bepalen'
+        ];
+        let msgIndex = 0;
+
+        if (this.loadingInterval) {
+            clearInterval(this.loadingInterval);
+        }
+
         this.loadingInterval = setInterval(() => {
             if (this.currentPosition) {
                 clearInterval(this.loadingInterval);
                 return;
             }
             dots = (dots + 1) % 4;
-            const dotStr = '.'.repeat(dots);
-            this.updateStatus(`GPS wordt gezocht${dotStr}`);
-        }, 500);
+            if (dots === 0) {
+                msgIndex = (msgIndex + 1) % messages.length;
+            }
+            const dotStr = '.'.repeat(dots || 1);
+            this.updateStatus(`${messages[msgIndex]}${dotStr}`);
+        }, 600);
     }
 
     /**
@@ -330,19 +412,20 @@ class GraveFinderApp {
         }
 
         let message = '';
+        let showHelp = true;
 
         switch (error.code) {
             case 1: // PERMISSION_DENIED
-                message = 'Locatie toegang geweigerd. Geef toestemming in je browserinstellingen en herlaad de pagina.';
+                message = 'Locatie toegang geweigerd.\n\nGa naar je telefoon instellingen en geef deze website toestemming voor locatie.';
                 break;
             case 2: // POSITION_UNAVAILABLE
-                message = 'Locatie niet beschikbaar. Zorg dat je buiten bent voor een goed GPS signaal.';
+                message = 'Locatie niet beschikbaar.\n\nTips:\n• Ga naar buiten\n• Wacht op GPS signaal\n• Controleer of locatie aan staat';
                 break;
             case 3: // TIMEOUT
-                message = 'GPS time-out. Controleer of locatieservices aan staan op je telefoon.';
+                message = 'Kon geen GPS signaal vinden.\n\nTips:\n• Zet locatie/GPS aan in je telefoon instellingen\n• Ga naar buiten voor beter signaal\n• Probeer opnieuw';
                 break;
             default:
-                message = 'Er is een fout opgetreden. Controleer je locatie-instellingen en probeer opnieuw.';
+                message = 'Er ging iets mis.\n\nControleer of locatieservices aan staan en probeer opnieuw.';
         }
 
         this.showError(message);
@@ -354,6 +437,7 @@ class GraveFinderApp {
     showError(message) {
         this.gpsStarted = false;
         this.elements.errorMessage.textContent = message;
+        this.elements.errorMessage.style.whiteSpace = 'pre-line';
         this.showScreen('error');
     }
 
